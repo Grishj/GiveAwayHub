@@ -5,9 +5,10 @@ import FilterBar from './components/FilterBar';
 import Modal from './components/Modal';
 import Dashboard from './components/Dashboard';
 import DonationForm from './components/DonationForm';
-import { Item, Notification, ItemStatus } from './types';
-import { MOCK_ITEMS, MOCK_DASHBOARD_ITEMS } from './constants';
-import { SearchIcon, BellIcon, XIcon } from './components/Icons';
+import Auth from './components/Auth';
+import { Item, Notification, ItemStatus, ItemRequest, Requester } from './types';
+import { MOCK_ITEMS, MOCK_DASHBOARD_ITEMS, CURRENT_USER } from './constants';
+import { SearchIcon, BellIcon, XIcon, MapPinIcon } from './components/Icons';
 
 // ECharts, Leaflet, p5.js etc. are loaded from CDN, declare them to TypeScript
 declare const anime: any;
@@ -17,6 +18,47 @@ declare const L: any;
 declare const p5: any;
 
 type View = 'home' | 'browse' | 'dashboard' | 'donate';
+
+// ========= LOCATION PICKER COMPONENT ========= //
+const LocationPicker: React.FC<{ onLocationSelect: (loc: { address: string, city: string, state: string, zip: string }) => void, onClose: () => void }> = ({ onLocationSelect, onClose }) => {
+    const mapRef = useRef<any>(null);
+    const markerRef = useRef<any>(null);
+
+    useEffect(() => {
+        if (!mapRef.current) {
+            mapRef.current = L.map('location-picker-map').setView([40.7128, -74.0060], 11);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(mapRef.current);
+
+            mapRef.current.on('click', (e: any) => {
+                const { lat, lng } = e.latlng;
+                if (markerRef.current) {
+                    markerRef.current.setLatLng(e.latlng);
+                } else {
+                    markerRef.current = L.marker(e.latlng).addTo(mapRef.current);
+                }
+                // Simulate reverse geocoding
+                 onLocationSelect({
+                    address: `123 Main Street`,
+                    city: 'Brooklyn',
+                    state: 'NY',
+                    zip: '11201'
+                });
+            });
+        }
+        setTimeout(() => mapRef.current?.invalidateSize(), 100);
+    }, [onLocationSelect]);
+    
+    return (
+      <div>
+        <h3 className="font-bold text-lg mb-2">Select Pickup Location</h3>
+        <p className="text-sm text-gray-500 mb-4">Click on the map to set the location.</p>
+        <div id="location-picker-map" style={{ height: '400px', borderRadius: '8px' }}></div>
+        <div className="flex justify-end mt-4">
+            <button onClick={onClose} className="btn-primary px-6 py-2 rounded-lg font-semibold">Confirm Location</button>
+        </div>
+      </div>
+    )
+}
 
 // ========= HOME PAGE COMPONENTS ========= //
 
@@ -185,7 +227,7 @@ const MapView = ({ items }: { items: Item[] }) => {
     return <div id="items-map" className="map-container rounded-2xl shadow-lg" style={{height: '80vh'}}></div>
 }
 
-const BrowsePage = () => {
+const BrowsePage = ({ items: propItems, onRequestItem }: { items: Item[], onRequestItem: (item: Item) => void }) => {
     const [filters, setFilters] = useState<any>({ view: 'grid', categories: new Set(['all']), conditions: new Set(['all']), distance: 10, sortBy: 'distance'});
     const [searchTerm, setSearchTerm] = useState('');
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -197,7 +239,7 @@ const BrowsePage = () => {
     };
 
     const filteredItems = useMemo(() => {
-        let items = MOCK_ITEMS.filter(item => {
+        let items = propItems.filter(item => {
             const searchMatch = searchTerm === '' || 
                                 item.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                                 item.description.toLowerCase().includes(searchTerm.toLowerCase());
@@ -227,7 +269,7 @@ const BrowsePage = () => {
         });
 
         return items;
-    }, [filters, searchTerm]);
+    }, [filters, searchTerm, propItems]);
     
     return (
         <div className="pt-16">
@@ -255,7 +297,7 @@ const BrowsePage = () => {
                              <p className="text-gray-600 mb-6">Showing <b>{filteredItems.length}</b> items near you</p>
                              {filters?.view === 'grid' ? (
                                 <div className="item-grid">
-                                    {filteredItems.map(item => <ItemCard key={item.id} item={item} onViewDetails={handleViewDetails} />)}
+                                    {filteredItems.map(item => <ItemCard key={item.id} item={item} onViewDetails={handleViewDetails} onRequestItem={onRequestItem} />)}
                                 </div>
                              ) : (
                                 <MapView items={filteredItems} />
@@ -294,7 +336,7 @@ const BrowsePage = () => {
                                 <p className="text-gray-600">{selectedItem.location.address}</p>
                             </div>
                             <div className="flex gap-4">
-                                <button className="btn-primary px-6 py-3 rounded-lg font-semibold flex-1">Request Item</button>
+                                <button onClick={() => { onRequestItem(selectedItem); setIsModalOpen(false); }} className="btn-primary px-6 py-3 rounded-lg font-semibold flex-1">Request Item</button>
                                 <button className="border-2 border-primary-green text-primary-green px-6 py-3 rounded-lg font-semibold">Message Donor</button>
                             </div>
                         </div>
@@ -337,9 +379,15 @@ const NotificationToast: React.FC<{ notification: Notification, onClose: () => v
 // ========= MAIN APP COMPONENT ========= //
 
 const App: React.FC = () => {
+    const [isAuthenticated, setIsAuthenticated] = useState(false);
+    const [currentUser, setCurrentUser] = useState<Requester | null>(null);
     const [view, setView] = useState<View>('home');
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [dashboardItems, setDashboardItems] = useState<Item[]>(MOCK_DASHBOARD_ITEMS);
+    const [browseItems, setBrowseItems] = useState<Item[]>(MOCK_ITEMS);
+    const [itemToRequest, setItemToRequest] = useState<Item | null>(null);
+    const [isMapModalOpen, setMapModalOpen] = useState(false);
+    const [requesterLocation, setRequesterLocation] = useState({ address: '', city: '', state: '', zip: '' });
     const chartRef = useRef<any>(null);
 
     const addNotification = useCallback((message: string) => {
@@ -350,20 +398,76 @@ const App: React.FC = () => {
     const removeNotification = (id: number) => {
         setNotifications(prev => prev.filter(n => n.id !== id));
     };
+    
+    const handleLogin = (user: Requester) => {
+        setCurrentUser(user);
+        setIsAuthenticated(true);
+        addNotification(`Welcome back, ${user.name.split(' ')[0]}!`);
+    };
+
+    const handleSignup = (newUser: Requester) => {
+        setCurrentUser(newUser);
+        setIsAuthenticated(true);
+        addNotification('Welcome to GiveAwayHub! Your account has been created.');
+    };
+
+    const handleLogout = () => {
+        setIsAuthenticated(false);
+        setCurrentUser(null);
+        addNotification("You have been logged out.");
+    };
 
     const handleNavigate = (newView: View) => {
         setView(newView);
         window.scrollTo(0, 0);
     };
 
+    const handleRequestItemClick = (item: Item) => {
+        setItemToRequest(item);
+        setRequesterLocation({ address: '', city: '', state: '', zip: '' });
+    };
+
+    const handleConfirmRequest = () => {
+        if (!itemToRequest || !currentUser) return;
+
+        const fullAddress = `${requesterLocation.address}, ${requesterLocation.city}, ${requesterLocation.state} ${requesterLocation.zip}`;
+        const newRequest: ItemRequest = {
+            id: Date.now(),
+            requester: currentUser,
+            date: new Date().toISOString(),
+            requestAddress: fullAddress,
+        };
+
+        const updateItemState = (prevItems: Item[]) =>
+            prevItems.map(item =>
+                item.id === itemToRequest.id
+                    ? {
+                          ...item,
+                          requests: item.requests + 1,
+                          itemRequests: [...(item.itemRequests || []), newRequest],
+                      }
+                    : item
+            );
+
+        setBrowseItems(updateItemState);
+        setDashboardItems(updateItemState);
+
+        addNotification(`Your request for "${itemToRequest.title}" has been submitted!`);
+        addNotification(`Donor "${itemToRequest.donor.name}" has been notified of your request.`);
+
+        setItemToRequest(null);
+    };
+
     const handleDonationSubmit = (formData: Omit<Item, 'id' | 'images' | 'location' | 'distance' | 'donor' | 'posted' | 'views' | 'requests' | 'status'> & { location: string }) => {
+        if (!currentUser) return;
+        
         const newItem: Item = {
             id: Date.now(),
             ...formData,
             images: ["https://picsum.photos/seed/new-item/400/300"],
             location: { lat: 40.7128, lng: -74.0060, address: formData.location },
             distance: "0.1 miles",
-            donor: { name: "Michael R.", avatar: "https://i.pravatar.cc/150?u=michael", rating: 4.9 },
+            donor: { name: currentUser.name, avatar: currentUser.avatar, rating: 4.9 },
             posted: "Just now",
             views: 0,
             requests: 0,
@@ -371,6 +475,7 @@ const App: React.FC = () => {
         };
 
         setDashboardItems(prev => [newItem, ...prev]);
+        setBrowseItems(prev => [newItem, ...prev]);
         addNotification(`Your item "${newItem.title}" has been listed!`);
         handleNavigate('dashboard');
     };
@@ -432,6 +537,18 @@ const App: React.FC = () => {
                    breakpoints: { 1024: { perPage: 2 }, 768: { perPage: 1 } } 
                 }).mount();
            }
+            const storiesSplideEl = document.getElementById('stories-carousel');
+            if (storiesSplideEl && !(storiesSplideEl as any).splide) {
+                new Splide('#stories-carousel', {
+                    type: 'loop',
+                    perPage: 3,
+                    gap: '2rem',
+                    autoplay: true,
+                    interval: 5500,
+                    pauseOnHover: true,
+                    breakpoints: { 1024: { perPage: 2 }, 768: { perPage: 1 } }
+                }).mount();
+            }
        }
 
        return () => {
@@ -455,24 +572,24 @@ const App: React.FC = () => {
     );
 
     const CommunityStoryCard = ({ avatar, name, role, story }: { avatar: string, name: string, role: string, story: string }) => (
-        <div className="card-hover bg-gray-50 rounded-2xl p-8">
-            <div className="flex items-center mb-6">
+        <div className="card-hover bg-gray-50 rounded-2xl p-8 h-72 flex flex-col">
+            <div className="flex items-center mb-6 flex-shrink-0">
                 <img src={avatar} alt={name} className="w-16 h-16 rounded-full mr-4"/>
                 <div>
                     <h4 className="font-bold text-lg">{name}</h4>
                     <p className="text-gray-600">{role}</p>
                 </div>
             </div>
-            <p className="text-gray-700 italic">"{story}"</p>
+            <p className="text-gray-700 italic flex-grow">"{story}"</p>
         </div>
     );
 
     const renderView = () => {
         switch (view) {
             case 'browse':
-                return <BrowsePage />;
+                return <BrowsePage items={browseItems} onRequestItem={handleRequestItemClick} />;
             case 'dashboard':
-                return <Dashboard items={dashboardItems} setItems={setDashboardItems} addNotification={addNotification} onNavigate={handleNavigate} />;
+                return <Dashboard items={dashboardItems} setItems={setDashboardItems} addNotification={addNotification} onNavigate={handleNavigate} currentUser={currentUser} setCurrentUser={setCurrentUser} />;
             case 'donate':
                  return <DonationForm onDonate={handleDonationSubmit} />;
             case 'home':
@@ -481,7 +598,7 @@ const App: React.FC = () => {
                     <>
                         <Hero onDonateNow={() => handleNavigate('donate')} onFindItems={() => handleNavigate('browse')} />
                         <ImpactStats />
-                        <section className="py-20 bg-white">
+                        <section className="pt-20 pb-12 bg-white">
                             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                                 <div className="text-center mb-12">
                                     <h2 className="font-display text-4xl font-bold text-primary-green mb-4">Recently Added Items</h2>
@@ -489,9 +606,9 @@ const App: React.FC = () => {
                                 <div className="splide" id="featured-carousel">
                                     <div className="splide__track">
                                         <ul className="splide__list">
-                                          {MOCK_ITEMS.slice(0,5).map(item => (
+                                          {browseItems.slice(0,5).map(item => (
                                             <li key={item.id} className="splide__slide p-2">
-                                                <ItemCard item={item} onViewDetails={() => { handleNavigate('browse'); }} />
+                                                <ItemCard item={item} onViewDetails={() => { handleNavigate('browse'); }} onRequestItem={handleRequestItemClick} />
                                             </li>
                                           ))}
                                         </ul>
@@ -499,16 +616,29 @@ const App: React.FC = () => {
                                 </div>
                             </div>
                         </section>
-                        <section className="py-20 bg-gray-50">
+                        <section className="pt-12 pb-20 bg-gray-50">
                           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                               <div className="text-center mb-16">
                                   <h2 className="font-display text-4xl font-bold text-primary-green mb-4">Stories from Our Community</h2>
                               </div>
-                              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                                <CommunityStoryCard name="Sarah M." role="Donor since 2022" avatar="https://i.pravatar.cc/150?u=sarah" story="I've donated over 50 items and received heartfelt thank you messages from families. It's amazing to see how my children's outgrown clothes can bring joy to others."/>
-                                <CommunityStoryCard name="Maria L." role="Recipient" avatar="https://i.pravatar.cc/150?u=maria" story="As a single mom, this platform has been a lifesaver. My kids have warm coats for winter and books to read. The generosity of this community is incredible."/>
-                                <CommunityStoryCard name="Robert K." role="Volunteer Coordinator" avatar="https://i.pravatar.cc/150?u=robert" story="Coordinating pickups between donors and recipients has shown me the best of humanity. People genuinely want to help each other."/>
-                              </div>
+                               <div className="splide" id="stories-carousel">
+                                    <div className="splide__track">
+                                        <ul className="splide__list">
+                                            <li className="splide__slide p-2">
+                                                <CommunityStoryCard name="Sarah M." role="Donor since 2022" avatar="https://i.pravatar.cc/150?u=sarah" story="I've donated over 50 items and received heartfelt thank you messages from families. It's amazing to see how my children's outgrown clothes can bring joy to others."/>
+                                            </li>
+                                            <li className="splide__slide p-2">
+                                                <CommunityStoryCard name="Maria L." role="Recipient" avatar="https://i.pravatar.cc/150?u=maria" story="As a single mom, this platform has been a lifesaver. My kids have warm coats for winter and books to read. The generosity of this community is incredible."/>
+                                            </li>
+                                            <li className="splide__slide p-2">
+                                                <CommunityStoryCard name="Robert K." role="Volunteer Coordinator" avatar="https://i.pravatar.cc/150?u=robert" story="Coordinating pickups between donors and recipients has shown me the best of humanity. People genuinely want to help each other."/>
+                                            </li>
+                                             <li className="splide__slide p-2">
+                                                <CommunityStoryCard name="Jennifer L." role="New Donor" avatar="https://i.pravatar.cc/150?u=jennifer" story="Just made my first donation of baby clothes. The process was so simple and it feels great knowing these items will go to a family that needs them."/>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                </div>
                           </div>
                         </section>
                     </>
@@ -516,18 +646,82 @@ const App: React.FC = () => {
         }
     };
 
+    const handleLocationSelect = (loc: { address: string, city: string, state: string, zip: string }) => {
+        setRequesterLocation(loc);
+        setMapModalOpen(false);
+    };
+
+    const handleLocationChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const { name, value } = e.target;
+        setRequesterLocation(prev => ({ ...prev, [name]: value }));
+    };
+
+    const isAddressValid = requesterLocation.address.trim() !== '' && requesterLocation.city.trim() !== '' && requesterLocation.state.trim() !== '' && requesterLocation.zip.trim() !== '';
+
+    if (!isAuthenticated) {
+        return <Auth onLogin={handleLogin} onSignup={handleSignup} />;
+    }
+
     return (
         <>
-            <Header onNavigate={handleNavigate} />
+            <Header onNavigate={handleNavigate} currentUser={currentUser} onLogout={handleLogout} />
             <main>
                 {renderView()}
             </main>
             <Footer />
-            <div className="fixed top-0 right-0 z-[2000] p-4 space-y-4">
+            <div className="fixed top-24 right-5 space-y-4 z-[2000]">
               {notifications.map(notification => (
                   <NotificationToast key={notification.id} notification={notification} onClose={() => removeNotification(notification.id)} />
               ))}
             </div>
+            <Modal isOpen={!!itemToRequest} onClose={() => setItemToRequest(null)}>
+                {itemToRequest && (
+                    <div className="p-4">
+                        <h2 className="font-display text-2xl font-bold text-primary-green mb-4 text-center">Confirm Your Request</h2>
+                        <img src={itemToRequest.images[0]} alt={itemToRequest.title} className="w-full max-w-sm mx-auto h-48 object-cover rounded-lg mb-4"/>
+                        <p className="text-xl font-bold text-charcoal mb-4 text-center">{itemToRequest.title}</p>
+                        
+                        <div className="my-6 p-4 bg-gray-50 rounded-lg space-y-4">
+                            <h3 className="font-semibold text-charcoal text-center">Enter your pickup address</h3>
+                             <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-1">Address</label>
+                                <div className="relative">
+                                    <input type="text" name="address" value={requesterLocation.address} onChange={handleLocationChange} required className="w-full px-4 py-2 bg-white text-black border border-gray-300 rounded-lg pr-24" placeholder="e.g., 123 Main St" />
+                                    <button type="button" onClick={() => setMapModalOpen(true)} className="absolute right-1 top-1/2 -translate-y-1/2 text-primary-green text-sm font-semibold hover:underline flex items-center gap-1 px-2">
+                                        <MapPinIcon className="w-4 h-4" />
+                                        From Map
+                                    </button>
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div>
+                                    <label className="block text-sm font-semibold text-gray-700 mb-1">City</label>
+                                    <input type="text" name="city" value={requesterLocation.city} onChange={handleLocationChange} required className="w-full px-4 py-2 bg-white text-black border border-gray-300 rounded-lg" placeholder="City" />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-semibold text-gray-700 mb-1">State</label>
+                                    <input type="text" name="state" value={requesterLocation.state} onChange={handleLocationChange} required className="w-full px-4 py-2 bg-white text-black border border-gray-300 rounded-lg" placeholder="State" />
+                                </div>
+                                 <div>
+                                    <label className="block text-sm font-semibold text-gray-700 mb-1">ZIP Code</label>
+                                    <input type="text" name="zip" value={requesterLocation.zip} onChange={handleLocationChange} required className="w-full px-4 py-2 bg-white text-black border border-gray-300 rounded-lg" placeholder="ZIP" />
+                                </div>
+                            </div>
+                        </div>
+
+                        <p className="text-sm text-gray-600 mb-6 text-center">The donor, {itemToRequest.donor.name}, will be notified. They will review your request and contact you if it's approved.</p>
+                        <div className="flex gap-4 justify-center">
+                            <button onClick={() => setItemToRequest(null)} className="flex-1 max-w-[180px] px-6 py-3 border border-gray-300 rounded-lg font-semibold text-gray-600 hover:bg-gray-50">Cancel</button>
+                            <button onClick={handleConfirmRequest} disabled={!isAddressValid} className="btn-primary flex-1 max-w-[180px] px-6 py-3 rounded-lg font-semibold disabled:bg-gray-400 disabled:cursor-not-allowed">Confirm Request</button>
+                        </div>
+                    </div>
+                )}
+            </Modal>
+             <Modal isOpen={isMapModalOpen} onClose={() => setMapModalOpen(false)}>
+                <div id="location-picker-container">
+                    <LocationPicker onLocationSelect={handleLocationSelect} onClose={() => setMapModalOpen(false)} />
+                </div>
+            </Modal>
         </>
     );
 };

@@ -1,7 +1,25 @@
-import { Item, ItemCategory, ItemCondition, ItemStatus, DashboardRequest, RequestStatus, Conversation } from './types';
+import { Item, ItemCategory, ItemCondition, ItemStatus, DashboardRequest, RequestStatus, Conversation, ChatMessage, Requester, ItemRequest } from './types';
 
 export const CATEGORIES = Object.values(ItemCategory);
 export const CONDITIONS = Object.values(ItemCondition);
+
+export const CURRENT_USER: Requester = {
+  name: "Jane Doe",
+  phone: "+1 (555) 987-6543",
+  avatar: "https://i.pravatar.cc/150?u=janedoe",
+  address: "456 Oak Avenue, Brooklyn, NY 11201",
+  email: "jane.doe@example.com",
+};
+
+const MOCK_REQUESTERS: Requester[] = [
+    { name: "Alex Johnson", phone: "+1 (555) 111-2222", avatar: "https://i.pravatar.cc/150?u=alex", address: "123 Pine Street, Manhattan, NY 10001", email: "alex@example.com" },
+    { name: "Maria Garcia", phone: "+1 (555) 333-4444", avatar: "https://i.pravatar.cc/150?u=mariag", address: "789 Maple Drive, Queens, NY 11354", email: "maria@example.com" },
+];
+
+const MOCK_ITEM_REQUESTS: ItemRequest[] = [
+    { id: 1001, requester: MOCK_REQUESTERS[0], date: "2024-07-28T14:30:00Z", requestAddress: "123 Pine Street, Manhattan, NY 10001" },
+    { id: 1002, requester: MOCK_REQUESTERS[1], date: "2024-07-29T09:15:00Z", requestAddress: "789 Maple Drive, Queens, NY 11354" },
+];
 
 export const MOCK_ITEMS: Item[] = [
     {
@@ -16,7 +34,8 @@ export const MOCK_ITEMS: Item[] = [
         donor: { name: "Sarah M.", avatar: "https://i.pravatar.cc/150?u=sarah", rating: 4.8 },
         posted: "2 hours ago",
         views: 23,
-        requests: 3
+        requests: 2,
+        itemRequests: MOCK_ITEM_REQUESTS,
     },
     {
         id: 2,
@@ -58,7 +77,10 @@ export const MOCK_ITEMS: Item[] = [
         donor: { name: "Jennifer L.", avatar: "https://i.pravatar.cc/150?u=jennifer", rating: 5.0 },
         posted: "8 hours ago",
         views: 67,
-        requests: 12
+        requests: 12,
+        itemRequests: [
+          { id: 1003, requester: MOCK_REQUESTERS[0], date: "2024-07-29T11:00:00Z", requestAddress: "123 Pine Street, Manhattan, NY 10001" }
+        ],
     },
     {
         id: 5,
@@ -105,7 +127,7 @@ export const MOCK_ITEMS: Item[] = [
 ];
 
 export const MOCK_DASHBOARD_ITEMS: Item[] = [
-    { ...MOCK_ITEMS[0], id: 101, status: ItemStatus.Available, requests: 3, views: 23, posted: "2 days ago" },
+    { ...MOCK_ITEMS[0], id: 101, status: ItemStatus.Available, requests: 2, views: 23, posted: "2 days ago", itemRequests: MOCK_ITEM_REQUESTS },
     { ...MOCK_ITEMS[1], id: 102, status: ItemStatus.Pending, requests: 7, views: 45, posted: "5 days ago" },
     { ...MOCK_ITEMS[2], id: 103, status: ItemStatus.Donated, requests: 2, views: 12, posted: "1 week ago" }
 ];
@@ -155,3 +177,17 @@ export const MOCK_CONVERSATIONS: Conversation[] = [
         avatar: "https://i.pravatar.cc/150?u=lisa"
     }
 ];
+
+export const MOCK_MESSAGES: { [key: number]: ChatMessage[] } = {
+  1: [
+    { id: 1, text: "Hi! When can I pick up the coats?", sender: "Sarah M.", timestamp: "10:30 AM" },
+    { id: 2, text: "Hi Sarah! How about tomorrow afternoon around 2 PM?", sender: "me", timestamp: "10:32 AM" },
+    { id: 3, text: "That works for me! See you then.", sender: "Sarah M.", timestamp: "10:33 AM" },
+    { id: 4, text: "Perfect. I'll have them ready for you.", sender: "me", timestamp: "10:34 AM" }
+  ],
+  2: [
+    { id: 1, text: "Thank you for the dining set!", sender: "Lisa K.", timestamp: "Yesterday" },
+    { id: 2, text: "You're very welcome, Lisa! I'm glad it found a new home.", sender: "me", timestamp: "Yesterday" },
+    { id: 3, text: "It's perfect for our family. We really appreciate it!", sender: "Lisa K.", timestamp: "Yesterday" }
+  ]
+};

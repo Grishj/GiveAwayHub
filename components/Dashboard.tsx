@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { MOCK_DASHBOARD_REQUESTS, MOCK_CONVERSATIONS } from '../constants';
-import { Item, DashboardRequest, Conversation, ItemStatus, RequestStatus } from '../types';
+import { MOCK_DASHBOARD_REQUESTS, MOCK_CONVERSATIONS, MOCK_MESSAGES } from '../constants';
+import { Item, DashboardRequest, Conversation, ItemStatus, RequestStatus, ChatMessage, ItemRequest, Requester } from '../types';
 import Modal from './Modal';
 import ItemForm from './ItemForm';
 import { MyItemsIcon, MyRequestsIcon, MessagesIcon, ImpactIcon, SettingsIcon, TopDonorIcon, VerifiedDonorIcon, CommunityHelperIcon, MailIcon, CheckIcon, EditIcon, TrashIcon } from './Icons';
@@ -15,6 +15,8 @@ interface DashboardProps {
     setItems: React.Dispatch<React.SetStateAction<Item[]>>;
     addNotification: (message: string) => void;
     onNavigate: (view: View) => void;
+    currentUser: Requester | null;
+    setCurrentUser: React.Dispatch<React.SetStateAction<Requester | null>>;
 }
 
 // ========= REUSABLE & CUSTOM COMPONENTS ========= //
@@ -38,7 +40,7 @@ const Checkbox: React.FC<{ label: string; checked: boolean; onChange: (checked: 
 
 // ========= TAB CONTENT COMPONENTS ========= //
 
-const MyItemsTab: React.FC<{ items: Item[], onAddItem: () => void, onEditItem: (item: Item) => void, onDeleteItem: (itemId: number) => void, addNotification: (message: string) => void }> = ({ items, onAddItem, onEditItem, onDeleteItem, addNotification }) => (
+const MyItemsTab: React.FC<{ items: Item[], onAddItem: () => void, onEditItem: (item: Item) => void, onDeleteItem: (itemId: number) => void, onViewRequests: (item: Item) => void }> = ({ items, onAddItem, onEditItem, onDeleteItem, onViewRequests }) => (
     <div>
         <div className="flex justify-between items-center mb-6">
             <h2 className="text-3xl font-bold text-charcoal">My Donated Items</h2>
@@ -68,7 +70,7 @@ const MyItemsTab: React.FC<{ items: Item[], onAddItem: () => void, onEditItem: (
                         </div>
                         <div className="border-t my-4"></div>
                         <div className="flex justify-end items-center gap-4">
-                            <button onClick={() => addNotification(`New request for "${item.title}"!`)} className="font-semibold text-primary-green hover:underline">View Requests</button>
+                            <button onClick={() => onViewRequests(item)} className="font-semibold text-primary-green hover:underline">View Requests</button>
                             <button onClick={() => onEditItem(item)} className="font-semibold text-gray-600 hover:underline flex items-center gap-1"><EditIcon /> Edit</button>
                             <button onClick={() => onDeleteItem(item.id)} className="font-semibold text-coral hover:underline flex items-center gap-1"><TrashIcon /> Delete</button>
                         </div>
@@ -112,40 +114,121 @@ const MyRequestsTab: React.FC<{ requests: DashboardRequest[], addNotification: (
 );
 
 const MessagesTab: React.FC = () => {
-    const [selectedConversation, setSelectedConversation] = useState<number | null>(null);
+    const [selectedConversationId, setSelectedConversationId] = useState<number | null>(1);
+    const [messages, setMessages] = useState<ChatMessage[]>([]);
+    const [newMessage, setNewMessage] = useState('');
+    const messagesEndRef = useRef<null | HTMLDivElement>(null);
+
+    const selectedConversation = MOCK_CONVERSATIONS.find(c => c.id === selectedConversationId);
+
+    useEffect(() => {
+        if (selectedConversationId) {
+            setMessages(MOCK_MESSAGES[selectedConversationId] || []);
+        } else {
+            setMessages([]);
+        }
+    }, [selectedConversationId]);
+    
+    useEffect(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, [messages]);
+
+    const handleSendMessage = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (newMessage.trim() === '' || !selectedConversation) return;
+
+        const userMessage: ChatMessage = {
+            id: Date.now(),
+            text: newMessage,
+            sender: 'me',
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        };
+        
+        const updatedMessages = [...messages, userMessage];
+        setMessages(updatedMessages);
+        setNewMessage('');
+        
+        // Simulate reply
+        setTimeout(() => {
+            const replyMessage: ChatMessage = {
+                id: Date.now() + 1,
+                text: "Thanks for your message! I'll get back to you shortly.",
+                sender: selectedConversation.name,
+                timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            };
+            setMessages(prev => [...prev, replyMessage]);
+        }, 1500);
+    };
+
 
     return (
         <div>
             <h2 className="text-3xl font-bold text-charcoal mb-6">Messages</h2>
             <div className="bg-white rounded-2xl shadow">
-                <div className="grid grid-cols-1 md:grid-cols-3 min-h-[600px]">
-                    <div className="md:col-span-1 border-r border-gray-100">
-                        <div className="p-4 border-b border-gray-100">
+                <div className="grid grid-cols-1 md:grid-cols-3 min-h-[600px] max-h-[600px]">
+                    <div className="md:col-span-1 border-r border-gray-100 overflow-y-auto">
+                        <div className="p-4 border-b border-gray-100 sticky top-0 bg-white">
                             <h3 className="font-bold text-lg">Conversations</h3>
                         </div>
                         <div className="divide-y divide-gray-100">
                             {MOCK_CONVERSATIONS.map(convo => (
-                                <div key={convo.id} onClick={() => setSelectedConversation(convo.id)}
-                                    className={`p-4 flex items-center space-x-4 cursor-pointer hover:bg-soft-gray ${selectedConversation === convo.id ? 'bg-soft-gray' : ''}`}>
+                                <div key={convo.id} onClick={() => setSelectedConversationId(convo.id)}
+                                    className={`p-4 flex items-center space-x-4 cursor-pointer hover:bg-soft-gray ${selectedConversationId === convo.id ? 'bg-soft-gray' : ''}`}>
                                     <img src={convo.avatar} alt={convo.name} className="w-12 h-12 rounded-full"/>
-                                    <div className="flex-1">
+                                    <div className="flex-1 overflow-hidden">
                                         <div className="flex justify-between">
                                             <p className="font-bold">{convo.name}</p>
-                                            <p className="text-xs text-gray-500">{convo.time}</p>
+                                            <p className="text-xs text-gray-500 flex-shrink-0">{convo.time}</p>
                                         </div>
                                         <div className="flex justify-between items-start">
-                                            <p className="text-sm text-gray-600 truncate w-48">{convo.lastMessage}</p>
-                                            {convo.unread && <span className="w-2.5 h-2.5 bg-coral rounded-full flex-shrink-0"></span>}
+                                            <p className="text-sm text-gray-600 truncate">{convo.lastMessage}</p>
+                                            {convo.unread && <span className="w-2.5 h-2.5 bg-coral rounded-full flex-shrink-0 ml-2 mt-1"></span>}
                                         </div>
                                     </div>
                                 </div>
                             ))}
                         </div>
                     </div>
-                    <div className="md:col-span-2 flex flex-col items-center justify-center p-8 text-center text-gray-500">
-                        <MailIcon className="w-24 h-24 text-gray-300" />
-                        <h3 className="text-xl font-bold text-charcoal mt-4">Select a conversation</h3>
-                        <p>Choose one of your conversations to see the messages.</p>
+                    <div className="md:col-span-2 flex flex-col">
+                        {selectedConversation ? (
+                            <>
+                                <div className="p-4 border-b border-gray-100 flex items-center space-x-4">
+                                    <img src={selectedConversation.avatar} alt={selectedConversation.name} className="w-10 h-10 rounded-full"/>
+                                    <div>
+                                        <h4 className="font-bold">{selectedConversation.name}</h4>
+                                        <p className="text-xs text-gray-500">Online</p>
+                                    </div>
+                                </div>
+                                <div className="flex-1 p-6 overflow-y-auto bg-gray-50 space-y-4">
+                                    {messages.map(msg => (
+                                        <div key={msg.id} className={`flex items-end gap-2 ${msg.sender === 'me' ? 'justify-end' : ''}`}>
+                                            {msg.sender !== 'me' && <img src={selectedConversation.avatar} alt={msg.sender} className="w-6 h-6 rounded-full"/>}
+                                            <div className={`max-w-xs lg:max-w-md px-4 py-2 rounded-xl ${msg.sender === 'me' ? 'bg-primary-green text-white rounded-br-none' : 'bg-white text-charcoal rounded-bl-none'}`}>
+                                                <p className="text-sm">{msg.text}</p>
+                                                <p className={`text-xs mt-1 ${msg.sender === 'me' ? 'text-green-200' : 'text-gray-400'}`}>{msg.timestamp}</p>
+                                            </div>
+                                        </div>
+                                    ))}
+                                    <div ref={messagesEndRef} />
+                                </div>
+                                <div className="p-4 border-t border-gray-100 bg-white">
+                                    <form onSubmit={handleSendMessage} className="flex items-center space-x-3">
+                                        <input type="text" value={newMessage} onChange={e => setNewMessage(e.target.value)} placeholder="Type your message..." className="w-full px-4 py-2 border border-gray-300 rounded-full focus:ring-2 focus:ring-primary-green focus:border-transparent"/>
+                                        <button type="submit" className="btn-primary rounded-full p-3 flex-shrink-0">
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                                <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
+                                            </svg>
+                                        </button>
+                                    </form>
+                                </div>
+                            </>
+                        ) : (
+                            <div className="flex flex-col items-center justify-center p-8 text-center text-gray-500 h-full">
+                                <MailIcon className="w-24 h-24 text-gray-300" />
+                                <h3 className="text-xl font-bold text-charcoal mt-4">Select a conversation</h3>
+                                <p>Choose one of your conversations to see the messages.</p>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
@@ -250,10 +333,20 @@ const ImpactStatsTab: React.FC = () => {
     );
 };
 
-const SettingsTab: React.FC<{ addNotification: (message: string) => void }> = ({ addNotification }) => {
-    const [profile, setProfile] = useState({ fullName: 'Michael Rodriguez', email: 'michael.r@email.com', phone: '+1 (555) 123-4567', location: 'New York, NY'});
+interface SettingsTabProps {
+    profile: Requester;
+    setProfile: React.Dispatch<React.SetStateAction<Requester | null>>;
+    addNotification: (message: string) => void;
+}
+
+const SettingsTab: React.FC<SettingsTabProps> = ({ profile, setProfile, addNotification }) => {
     const [notifications, setNotifications] = useState({ newRequests: true, messages: false, weeklySummary: true, newItems: false });
     const [privacy, setPrivacy] = useState({ showProfile: true, allowDirectMessages: true, showImpactStats: false });
+    
+    const handleProfileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const { name, value } = e.target;
+        setProfile(prev => prev ? { ...prev, [name]: value } : null);
+    };
 
     return (
         <div>
@@ -264,19 +357,19 @@ const SettingsTab: React.FC<{ addNotification: (message: string) => void }> = ({
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
                             <label className="block text-sm font-semibold text-gray-700 mb-2">Full Name</label>
-                            <input type="text" value={profile.fullName} onChange={e => setProfile({...profile, fullName: e.target.value})} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-green focus:border-transparent"/>
+                            <input type="text" name="name" value={profile.name} onChange={handleProfileChange} className="w-full px-4 py-2 bg-white text-black border border-gray-300 rounded-lg"/>
                         </div>
                         <div>
                             <label className="block text-sm font-semibold text-gray-700 mb-2">Email</label>
-                            <input type="email" value={profile.email} onChange={e => setProfile({...profile, email: e.target.value})} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-green focus:border-transparent"/>
+                            <input type="email" name="email" value={profile.email} onChange={handleProfileChange} className="w-full px-4 py-2 bg-white text-black border border-gray-300 rounded-lg"/>
                         </div>
                         <div>
                             <label className="block text-sm font-semibold text-gray-700 mb-2">Phone</label>
-                            <input type="tel" value={profile.phone} onChange={e => setProfile({...profile, phone: e.target.value})} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-green focus:border-transparent"/>
+                            <input type="tel" name="phone" value={profile.phone} onChange={handleProfileChange} className="w-full px-4 py-2 bg-white text-black border border-gray-300 rounded-lg"/>
                         </div>
                          <div>
-                            <label className="block text-sm font-semibold text-gray-700 mb-2">Location</label>
-                            <input type="text" value={profile.location} onChange={e => setProfile({...profile, location: e.target.value})} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-green focus:border-transparent"/>
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">Default Address</label>
+                            <input type="text" name="address" value={profile.address} onChange={handleProfileChange} className="w-full px-4 py-2 bg-white text-black border border-gray-300 rounded-lg"/>
                         </div>
                     </div>
                     <div className="mt-6 flex justify-end">
@@ -310,10 +403,15 @@ const SettingsTab: React.FC<{ addNotification: (message: string) => void }> = ({
 
 // ========= MAIN DASHBOARD COMPONENT ========= //
 
-const Dashboard: React.FC<DashboardProps> = ({ items, setItems, addNotification, onNavigate }) => {
+const Dashboard: React.FC<DashboardProps> = ({ items, setItems, addNotification, onNavigate, currentUser, setCurrentUser }) => {
     const [activeTab, setActiveTab] = useState<Tab>('my-items');
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [itemToEdit, setItemToEdit] = useState<Item | null>(null);
+    const [viewingRequestsForItem, setViewingRequestsForItem] = useState<Item | null>(null);
+    
+    if (!currentUser) {
+        return <div>Loading profile...</div>;
+    }
 
     const handleUpdateItem = (updatedItem: Item) => {
         setItems(prev => prev.map(item => item.id === updatedItem.id ? updatedItem : item));
@@ -329,6 +427,10 @@ const Dashboard: React.FC<DashboardProps> = ({ items, setItems, addNotification,
     const handleDeleteItem = (itemId: number) => {
         setItems(prev => prev.filter(item => item.id !== itemId));
         addNotification("Item deleted.");
+    };
+
+    const handleViewRequests = (item: Item) => {
+        setViewingRequestsForItem(item);
     };
 
     const TabButton: React.FC<{ tabId: Tab, icon: React.ReactNode, label: string, count?: number }> = ({ tabId, icon, label, count }) => {
@@ -354,11 +456,11 @@ const Dashboard: React.FC<DashboardProps> = ({ items, setItems, addNotification,
 
     const renderTabContent = () => {
         switch (activeTab) {
-            case 'my-items': return <MyItemsTab items={items} onAddItem={() => onNavigate('donate')} onEditItem={handleOpenModalForEdit} onDeleteItem={handleDeleteItem} addNotification={addNotification} />;
+            case 'my-items': return <MyItemsTab items={items} onAddItem={() => onNavigate('donate')} onEditItem={handleOpenModalForEdit} onDeleteItem={handleDeleteItem} onViewRequests={handleViewRequests} />;
             case 'my-requests': return <MyRequestsTab requests={MOCK_DASHBOARD_REQUESTS} addNotification={addNotification} />;
             case 'messages': return <MessagesTab />;
             case 'impact': return <ImpactStatsTab />;
-            case 'settings': return <SettingsTab addNotification={addNotification} />;
+            case 'settings': return <SettingsTab profile={currentUser} setProfile={setCurrentUser} addNotification={addNotification} />;
             default: return null;
         }
     };
@@ -369,9 +471,9 @@ const Dashboard: React.FC<DashboardProps> = ({ items, setItems, addNotification,
                  <div className="max-w-screen-xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="flex items-center justify-between mb-8">
                         <div className="flex items-center">
-                            <img src="https://i.pravatar.cc/150?u=michael" alt="Profile" className="w-16 h-16 rounded-full mr-5"/>
+                            <img src={currentUser.avatar} alt="Profile" className="w-16 h-16 rounded-full mr-5"/>
                             <div>
-                                <h1 className="font-display text-4xl font-bold text-charcoal">Welcome back, Michael!</h1>
+                                <h1 className="font-display text-4xl font-bold text-charcoal">Welcome back, {currentUser.name.split(' ')[0]}!</h1>
                                 <p className="text-gray-600">Member since January 2023</p>
                             </div>
                         </div>
@@ -413,6 +515,44 @@ const Dashboard: React.FC<DashboardProps> = ({ items, setItems, addNotification,
 
             <Modal isOpen={isModalOpen} onClose={() => { setIsModalOpen(false); setItemToEdit(null); }}>
                 <ItemForm onAddItem={handleUpdateItem} onClose={() => { setIsModalOpen(false); setItemToEdit(null); }} itemToEdit={itemToEdit} />
+            </Modal>
+
+            <Modal isOpen={!!viewingRequestsForItem} onClose={() => setViewingRequestsForItem(null)}>
+                {viewingRequestsForItem && (
+                    <div>
+                        <h2 className="text-2xl font-bold text-charcoal mb-6">Requests for "{viewingRequestsForItem.title}"</h2>
+                        {(viewingRequestsForItem.itemRequests && viewingRequestsForItem.itemRequests.length > 0) ? (
+                            <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
+                                {viewingRequestsForItem.itemRequests.map((req: ItemRequest) => (
+                                    <div key={req.id} className="bg-soft-gray p-4 rounded-xl flex items-start justify-between">
+                                        <div className="flex items-center space-x-4">
+                                            <img src={req.requester.avatar} alt={req.requester.name} className="w-12 h-12 rounded-full" />
+                                            <div>
+                                                <p className="font-bold text-charcoal">{req.requester.name}</p>
+                                                <p className="text-sm text-gray-500">{req.requester.phone}</p>
+                                                <div className="mt-2 pt-2 border-t border-gray-200">
+                                                    <p className="text-xs text-gray-500 font-semibold">Pickup Address:</p>
+                                                    <p className="text-sm text-charcoal">{req.requestAddress}</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="text-right flex-shrink-0 ml-4">
+                                            <p className="text-sm text-gray-500">Requested on</p>
+                                            <p className="font-semibold text-sm text-charcoal">{new Date(req.date).toLocaleString()}</p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="text-center py-8">
+                                <p className="text-gray-500">No requests have been made for this item yet.</p>
+                            </div>
+                        )}
+                        <div className="flex justify-end mt-6">
+                            <button onClick={() => setViewingRequestsForItem(null)} className="btn-primary px-6 py-2 rounded-lg font-semibold">Close</button>
+                        </div>
+                    </div>
+                )}
             </Modal>
         </div>
     );

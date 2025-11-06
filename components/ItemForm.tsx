@@ -124,19 +124,19 @@ const ItemForm: React.FC<ItemFormProps> = ({ onAddItem, onClose, itemToEdit }) =
 
                 <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2">Item Title</label>
-                    <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} required className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-green focus:border-transparent" placeholder="e.g., Winter Coat Collection" />
+                    <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} required className="w-full px-4 py-3 bg-white text-black border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-green focus:border-transparent" placeholder="e.g., Winter Coat Collection" />
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                         <label className="block text-sm font-semibold text-gray-700 mb-2">Category</label>
-                        <select value={category} onChange={(e) => setCategory(e.target.value as ItemCategory)} required className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-green focus:border-transparent">
+                        <select value={category} onChange={(e) => setCategory(e.target.value as ItemCategory)} required className="w-full px-4 py-3 bg-white text-black border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-green focus:border-transparent">
                             <option value="">Select category</option>
                             {CATEGORIES.map(cat => <option key={cat} value={cat} className="capitalize">{cat}</option>)}
                         </select>
                     </div>
                     <div>
                         <label className="block text-sm font-semibold text-gray-700 mb-2">Condition</label>
-                        <select value={condition} onChange={(e) => setCondition(e.target.value as ItemCondition)} required className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-green focus:border-transparent">
+                        <select value={condition} onChange={(e) => setCondition(e.target.value as ItemCondition)} required className="w-full px-4 py-3 bg-white text-black border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-green focus:border-transparent">
                             <option value="">Select condition</option>
                             {CONDITIONS.map(con => <option key={con} value={con} className="capitalize">{con.replace('-', ' ')}</option>)}
                         </select>
@@ -144,17 +144,17 @@ const ItemForm: React.FC<ItemFormProps> = ({ onAddItem, onClose, itemToEdit }) =
                 </div>
                 <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2">Description</label>
-                    <textarea value={description} onChange={(e) => setDescription(e.target.value)} required rows={3} className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-green focus:border-transparent" placeholder="Describe your item in detail..."></textarea>
+                    <textarea value={description} onChange={(e) => setDescription(e.target.value)} required rows={3} className="w-full px-4 py-3 bg-white text-black border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-green focus:border-transparent" placeholder="Describe your item in detail..."></textarea>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                      <div>
                         <label className="block text-sm font-semibold text-gray-700 mb-2">Quantity</label>
-                        <input type="number" value={quantity} onChange={(e) => setQuantity(Number(e.target.value))} required min="1" className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-green focus:border-transparent" placeholder="Number of items" />
+                        <input type="number" value={quantity} onChange={(e) => setQuantity(Number(e.target.value))} required min="1" className="w-full px-4 py-3 bg-white text-black border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-green focus:border-transparent" placeholder="Number of items" />
                     </div>
                     <div>
                         <label className="block text-sm font-semibold text-gray-700 mb-2">Pickup Location</label>
                          <div className="relative">
-                            <input type="text" value={location} onChange={(e) => setLocation(e.target.value)} required className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-green focus:border-transparent pr-24" placeholder="e.g., Manhattan, NY" />
+                            <input type="text" value={location} onChange={(e) => setLocation(e.target.value)} required className="w-full px-4 py-3 bg-white text-black border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-green focus:border-transparent pr-24" placeholder="e.g., Manhattan, NY" />
                             <button type="button" onClick={() => setMapModalOpen(true)} className="absolute right-1 top-1/2 -translate-y-1/2 text-primary-green text-sm font-semibold hover:underline flex items-center gap-1 px-2">
                                 <MapPinIcon />
                                 From Map

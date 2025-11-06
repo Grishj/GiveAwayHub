@@ -4,9 +4,10 @@ import { Item } from '../types';
 interface ItemCardProps {
   item: Item;
   onViewDetails: (item: Item) => void;
+  onRequestItem: (item: Item) => void;
 }
 
-const ItemCard: React.FC<ItemCardProps> = ({ item, onViewDetails }) => {
+const ItemCard: React.FC<ItemCardProps> = ({ item, onViewDetails, onRequestItem }) => {
   return (
     <div 
         className="item-card card-hover bg-white rounded-2xl shadow-lg overflow-hidden cursor-pointer"
@@ -41,7 +42,7 @@ const ItemCard: React.FC<ItemCardProps> = ({ item, onViewDetails }) => {
                     <span className="ml-2">📋 {item.requests} requests</span>
                 </div>
                 <button 
-                    onClick={(e) => { e.stopPropagation(); onViewDetails(item); }}
+                    onClick={(e) => { e.stopPropagation(); onRequestItem(item); }}
                     className="btn-primary px-4 py-2 rounded-lg text-sm font-semibold"
                 >
                     Request Item

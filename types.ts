@@ -27,6 +27,21 @@ export interface Donor {
   rating: number;
 }
 
+export interface Requester {
+  name: string;
+  phone: string;
+  avatar: string;
+  address: string;
+  email: string;
+}
+
+export interface ItemRequest {
+  id: number;
+  requester: Requester;
+  date: string;
+  requestAddress: string;
+}
+
 export interface Item {
   id: number;
   title: string;
@@ -45,6 +60,7 @@ export interface Item {
   views: number;
   requests: number;
   status?: ItemStatus; // Status might be specific to dashboard items
+  itemRequests?: ItemRequest[];
 }
 
 export interface DashboardItem extends Item {
@@ -85,4 +101,11 @@ export interface GeolocationState {
 export interface Notification {
   id: number;
   message: string;
+}
+
+export interface ChatMessage {
+  id: number;
+  text: string;
+  sender: 'me' | string; // 'me' for the current user
+  timestamp: string;
 }
