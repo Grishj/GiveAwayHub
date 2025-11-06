@@ -1,0 +1,8 @@
+{
+  "name": "Copy of GiveAwayHub",
+  "description": "A community-driven platform to connect donors with recipients, making it easy to give and receive second-hand items for free. Browse local listings, request what you need, and donate items to help others.",
+  "requestFramePermissions": [
+    "geolocation",
+    "camera"
+  ]
+}
